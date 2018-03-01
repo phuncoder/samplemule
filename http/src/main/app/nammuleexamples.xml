@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+    <http:listener-config name="Http_8081" host="0.0.0.0" port="8081" basePath="/crud" doc:name="HTTP Listener Configuration"/>
+    <db:oracle-config name="Oracle_Configuration" host="localhost" port="1521" instance="xe" user="claim" password="claim" doc:name="Oracle Configuration"/>
+    <flow name="PostFromJSONToObjectDB">
+        <http:listener config-ref="Http_8081" path="/" doc:name="HTTP"/>
+        <json:json-to-object-transformer returnClass="au.phun.model.Student" doc:name="JSON to Object"/>
+        <ee:multi-transactional action="ALWAYS_BEGIN" doc:name="Transactional">
+            <foreach collection="#[payload.subjects]" counterVariableName="count" doc:name="For Each Subject">
+                <db:insert config-ref="Oracle_Configuration" doc:name="Database">
+                    <db:parameterized-query><![CDATA[INSERT INTO SUBJECT VALUES(#[payload.name], 
+#[payload.teachername])]]></db:parameterized-query>
+                </db:insert>
+            </foreach>
+            <db:insert config-ref="Oracle_Configuration" doc:name="Student">
+                <db:parameterized-query><![CDATA[INSERT INTO STUDENT VALUES (#[payload.name], #[payload.surname])]]></db:parameterized-query>
+            </db:insert>
+        </ee:multi-transactional>
+        <flow-ref name="SetOk" doc:name="Set Ok "/>
+    </flow>
+    <sub-flow name="SetOk">
+        <set-property propertyName="Content-Type" value="application/json" doc:name="Set Property Ok"/>
+        <set-payload value="{&quot;message&quot; : &quot;All good&quot;}" doc:name="Set Payload"/>
+    </sub-flow>
+    <catch-exception-strategy when="#[exception.causedBy(org.mule.example.ExceptionType)] &amp;&amp; #[exception.causeMatches('org.mule.example.*')]" name="Catch_Exception_Strategy">
+        <logger level="INFO" doc:name="Logger"/>
+    </catch-exception-strategy>
+</mule>

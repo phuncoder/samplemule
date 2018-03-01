@@ -1,0 +1,34 @@
+#%RAML 0.8
+title: WebConsumerAPI
+/WebConsumer:
+    get:
+      description: Get a response from a web page
+      responses:
+        200:
+          body:
+            application/json:
+    post:
+      description: Get some result
+      body:
+          application/json:
+            example: | 
+              {
+                "Request" : {
+                  "value" : 1,
+                  "to"    : "pounds",
+                  "from"  : "newtons"
+                }
+              }
+                      
+      responses:
+        200: 
+          body: 
+            application/json:
+              example: |
+                { 
+                  "Response" : {
+                    "code" : 200
+                    "message" : "This is correct"
+                  }
+                }
+            
