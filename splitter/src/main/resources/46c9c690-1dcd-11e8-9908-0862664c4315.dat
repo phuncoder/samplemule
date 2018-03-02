@@ -1,0 +1,9 @@
+[<employee>
+    <name>Nam</name>
+    <surname>Phuna</surname>
+    <age>42</age>
+  </employee>, <employee>
+    <name>Bianca</name>
+    <surname>Seeto</surname>
+    <age>40</age>
+  </employee>]

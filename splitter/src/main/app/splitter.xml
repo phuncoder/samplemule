@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration_8082" host="0.0.0.0" port="8082"  doc:name="HTTP Listener Configuration"/>
+    <db:oracle-config name="Oracle_XE" host="localhost" port="1521" instance="xe" user="claim" password="claim" doc:name="Oracle Configuration"/>
+    <flow name="SplitterXML">
+        <http:listener config-ref="HTTP_Listener_Configuration_8082" path="/SplitterXML" doc:name="HTTP"/>
+        <flow-ref name="splitterSub_Flow" doc:name="Flow Reference"/>
+        <vm:outbound-endpoint exchange-pattern="one-way" path="/vmqueue" doc:name=""/>
+    </flow>
+    <sub-flow name="splitterSub_Flow">
+        <splitter expression="#[xpath(&quot;//employee&quot;)]" doc:name="Splitter">
+            <expression-message-info-mapping messageIdExpression="#[message.id]" correlationIdExpression="#[message.correlationId]"/>
+        </splitter>
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <set-variable variableName="payloads" value="#[payload]" doc:name="SetToFlowChar"/>
+        <db:insert config-ref="Oracle_XE" doc:name="Database">
+            <db:parameterized-query><![CDATA[INSERT INTO employee VALUES(#[xpath('//name/text()').text], #[xpath('//surname/text()').text], #[xpath('//age/text()').text])]]></db:parameterized-query>
+        </db:insert>
+        <set-payload value="#[flowVars.payloads]" doc:name="Set Payload"/>
+        <collection-aggregator failOnTimeout="true" doc:name="Collection Aggregator"/>
+    </sub-flow>
+    <flow name="SplitterVMXML">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="/vmqueue" doc:name="VM"/>
+        <file:outbound-endpoint path="src/main/resources" responseTimeout="10000" doc:name="File"/>
+    </flow>
+    <flow name="SplitterJSON">
+        <http:listener config-ref="HTTP_Listener_Configuration_8082" path="/SplitterJSON" doc:name="HTTP"/>
+        <dw:transform-message doc:name="Transform Message" metadata:id="1a65dc30-55dd-483d-992b-07f4d620b922">
+            <dw:input-payload mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+---
+{
+	employees: {
+		(payload.employee map ((employee , indexOfEmployee) -> {
+			employee: {
+				name: employee.name,
+				surname: employee.surname,
+				age: employee.age as :number
+			}
+		}))
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <flow-ref name="splitterSub_Flow" doc:name="Flow Reference"/>
+        <vm:outbound-endpoint exchange-pattern="one-way" path="/vmqueue" doc:name="VM"/>
+    </flow>
+    <flow name="splitterFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration_8082" path="/CollectionSplitter" doc:name="HTTP"/>
+        <collection-splitter doc:name="Collection Splitter"/>
+        <file:outbound-endpoint path="src/main/resource" responseTimeout="10000" doc:name="File"/>
+    </flow>
+</mule>
